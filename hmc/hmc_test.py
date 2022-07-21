@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from hmc_classical import HMC_classical
 
 mu = 5.0
-Sigma = 1.0
+Sigma = 2.0
 
 def E_norm(x, mu, Sigma):
     # Define this as the energy of the state

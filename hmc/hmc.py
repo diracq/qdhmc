@@ -6,15 +6,29 @@ class HMC(object):
     def __init__(self, negative_log_prob):
         self.neg_log_prob = negative_log_prob
         
-    def updater(self, q, p):
-        raise NotImplementedError("Please implement")
+    def proposer(self, q, p):
+        raise NotImplementedError("Please define a method to perform HMC updates.")
 
     def sample(self, num_samples, initial_state):
+        """
+        Once the HMC object is defined, sample from it.
+        Args:
+            num_samples (int): Number of samples to take.
+            initial_state (list(float)): Location to start sampling. Vector whose size determines size of samples.
+        Returns:
+            samples (list(list(float))): A list of vectors samples from target distribution.
+        """
         samples = [initial_state]
-        momentum = tfp.distributions.Normal(loc=[0]*initial_state.shape[0], scale=[1]*initial_state.shape[0])
-        for p0 in momentum.sample([num_samples]).numpy():
-            q_new, p_new = self.updater(samples[-1], p0)
 
+        # Generate gaussian momentum kicks
+        momentum = tfp.distributions.Normal(loc=[0]*initial_state.shape[0], scale=[1]*initial_state.shape[0])
+
+        for p0 in momentum.sample([num_samples]).numpy():
+
+            # Proposal stage
+            q_new, p_new = self.proposer(samples[-1], p0)
+
+            # Metropolis-Hastings acceptance criteria
             start_log_p = self.neg_log_prob(samples[-1]) - np.sum(momentum.prob(p0).numpy())
             new_log_p = self.neg_log_prob(q_new) - np.sum(momentum.prob(p_new).numpy())
             if np.log(np.random.rand()) < start_log_p - new_log_p:

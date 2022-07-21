@@ -11,9 +11,25 @@ class HMC_classical(HMC):
         self.step_size = step_size
 
     def dVdq(self, q):
+        """
+        Returns the gradient of negative log probability w.r.t. position using TFP.
+        Args:
+            q (list(float)): Vector location at which to take gradient.
+        Returns:
+            gradient (list(float)): Gradient of neg_log_prob w.r.t. position at location q.
+        """
         return tfp.math.value_and_gradient(self.neg_log_prob, q)[1].numpy()
 
-    def updater(self, q, p):
+    def proposer(self, q, p):
+        """
+        Generates the HMC proposal using Leafrog integral.
+        Args:
+            q (list(float)): Vector of current position.
+            p (list(float)): Vector of current momentum (usually generated from gaussian).
+        Return:
+            q (list(float)): New position proposal.
+            p (list(float)): New momentum proposal.
+        """
         q, p = np.copy(q), np.copy(p)
 
         p -= self.step_size * self.dVdq(q) / 2  # half step
