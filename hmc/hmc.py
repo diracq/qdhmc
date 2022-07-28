@@ -26,6 +26,7 @@ class HMC(object):
         count = 1
         for p0 in momentum.sample([num_samples]).numpy():
 
+            # For debugging
             print("Sample " + str(count))
 
             # Proposal stage
