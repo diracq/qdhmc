@@ -11,8 +11,7 @@ import random
 
 from cv_ops import PositionOp, MomentumOp
 from cv_subroutines import centeredQFT
-from tests.util.cvutil import domain_bin
-from cv_utils import domain_float
+from cv_utils import domain_float_tf, domain_bin_tf
 
 RWResult = collections.namedtuple("RWResult", ['target_log_prob', 'log_acceptance_correction'])
 
@@ -33,6 +32,10 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
         xs = sympy.symbols('xs0:%d'%(num_vars*precision))
         self.trotterized_circuit = self.generate_circuit(self.r, xs, eta, lam)
         self.params = list(xs) + [eta] + [lam]
+        self.eta_mu = 0
+        self.lam_mu = 0
+        self.eta_sig = 1
+        self.lam_sig = 1
 
     @property
     def target_log_prob_fn(self):
@@ -62,8 +65,7 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
         circuit = cirq.Circuit()
         for i, qubits in enumerate(self.qubits):
             for j, qubit in enumerate(qubits):
-                if xs[i*self.precision + j] == '1':
-                    circuit += cirq.X(qubit)
+                circuit += cirq.X(qubit)**xs[i * self.precision + j]
         for _ in range(r):
             circuit += tfq.util.exponential(operators = [self.target_log_prob_fn([PositionOp(qubits) for qubits in self.qubits]).op], coefficients = [eta])
             circuit += [centeredQFT(qubits) for qubits in self.qubits]
@@ -76,28 +78,26 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
         return circuit
 
     def one_step(self, current_state, previous_kernel_results, seed=None):
-        eta_mu, lam_mu = 0, 0
-        eta_sig, lam_sig = 1, 1
-        eta = tf.random.normal(shape=[], mean=eta_mu, stddev=eta_sig, seed=seed)
+        eta = tf.random.normal(shape=[1], mean=self.eta_mu, stddev=self.eta_sig, seed=seed)
         eta *= self.t / self.r
-        lam = tf.random.normal(shape=[], mean=lam_mu, stddev=lam_sig, seed=seed)
+        lam = tf.random.normal(shape=[1], mean=self.lam_mu, stddev=self.lam_sig, seed=seed)
         lam *= self.t / self.r
         
-        bin_vals = ''
-        for x in current_state[0].numpy():
-            bin_vals += domain_bin(x, precision=self.precision)
-        # The first of these is to encode the binary values into the circuit
-        values = tf.concat([[float(bit) for bit in bin_vals], [eta], [lam]], axis=0)
-        # This could be updates to increase samples and take the most common one
+        bin_vals = domain_bin_tf(current_state, precision=self.precision)
+        bin_vals = tf.reshape(bin_vals, [bin_vals.shape[0] * bin_vals.shape[1]])
+        bin_vals = tf.cast(bin_vals, tf.float32)
+
+        values = tf.concat([bin_vals, eta, lam], axis=0)
         circuit_output = self.sample(self.trotterized_circuit, \
-            symbol_names=self.params, symbol_values=[values], repetitions=1)
-        bitstrings = [["".join([str(bit) for bit in bitlist[self.precision*var_idx:self.precision*(var_idx+1)]]) for var_idx in range(self.num_vars)] for bitlist in circuit_output.numpy()[0]][0]
-        next_state_list = [domain_float(bitstring) for bitstring in bitstrings]
-        next_state = tf.reshape(next_state_list, [1, len(current_state[0])])
-        next_state = tf.cast(next_state, dtype=tf.float64)
+            symbol_names=self.params, symbol_values=[values], repetitions=1).to_tensor()[0][0]
+        bitstrings = tf.convert_to_tensor([circuit_output[i * self.precision : i * self.precision + self.precision] for i in range(self.num_vars)], dtype=tf.float32)
+
+        next_state_list = domain_float_tf(bitstrings, self.precision)
+        next_state = tf.reshape(next_state_list, current_state.shape)
+        next_state = tf.cast(next_state, dtype=tf.float32)
 
         next_target_log_prob = self.target_log_prob_fn(next_state)
-
+        
         new_kernel_results = previous_kernel_results._replace(
             target_log_prob = next_target_log_prob)
 
@@ -106,14 +106,14 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
     def bootstrap_results(self, init_state):
         kernel_results = RWResult(
             target_log_prob = self.target_log_prob_fn(init_state),
-            log_acceptance_correction = tf.cast(tf.reshape([0.0], [1]), dtype=tf.float64)
+            log_acceptance_correction = tf.convert_to_tensor(0.0, dtype=tf.float32)
         )
         return kernel_results
 
     
 class HMC(object):
 
-    def __init__(self, target_log_prob, kernel_type="classical", step_size=None, steps=None, precision=None, t=None, r=None, num_vars=1):
+    def __init__(self, target_log_prob, kernel_type="classical", step_size=1.0, steps=3, precision=4, t=None, r=None, num_vars=1):
         self.precision = precision
         self.num_vars = num_vars
         if kernel_type == "quantum":
@@ -123,8 +123,9 @@ class HMC(object):
 
     def run_hmc(self, num_samples, num_burnin, init_state=None):
         if init_state is None:
-            init_state = tf.cast(tf.reshape(domain_float("".join([str(bit) for bit in [random.randint(0,1) for _ in range(self.precision)]])), [1, self.num_vars]), tf.float64)
+            init_state = tf.random.uniform(shape=[self.num_vars], minval=-2**(self.precision - 1), maxval=2**(self.precision - 1))
             
+        @tf.function
         def run_chain():
             # Run the chain (with burn-in).
             samples, (is_accepted, results) = tfp.mcmc.sample_chain(
