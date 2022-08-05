@@ -113,10 +113,10 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
     
 class HMC(object):
 
-    def __init__(self, target_log_prob, kernel_type="classical", step_size=1.0, steps=3, precision=4, t=None, r=None, num_vars=1):
+    def __init__(self, target_log_prob, num_vars, precision, kernel_type="classical", step_size=1.0, steps=3, t=None, r=None):
         self.precision = precision
         self.num_vars = num_vars
-        if kernel_type == "quantum":
+        if kernel_type != "classical":
             self.kernel = tfp.mcmc.MetropolisHastings(QDHMCKernel(target_log_prob, precision, t, r, num_vars))
         else:
             self.kernel = tfp.mcmc.HamiltonianMonteCarlo(target_log_prob_fn=target_log_prob, num_leapfrog_steps=steps, step_size=step_size)
@@ -127,7 +127,6 @@ class HMC(object):
             
         @tf.function
         def run_chain():
-            # Run the chain (with burn-in).
             samples, (is_accepted, results) = tfp.mcmc.sample_chain(
                 num_results=num_samples,
                 num_burnin_steps=num_burnin,
