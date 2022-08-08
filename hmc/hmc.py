@@ -23,7 +23,11 @@ class HMC(object):
         # Generate gaussian momentum kicks
         momentum = tfp.distributions.Normal(loc=[0]*initial_state.shape[0], scale=[1]*initial_state.shape[0])
 
+        count = 1
         for p0 in momentum.sample([num_samples]).numpy():
+
+            # For debugging
+            print("Sample " + str(count))
 
             # Proposal stage
             q_new, p_new = self.proposer(samples[-1], p0)
@@ -35,5 +39,7 @@ class HMC(object):
                 samples.append(q_new)
             else:
                 samples.append(np.copy(samples[-1]))
+
+            count += 1
         
         return np.array(samples[1:])
