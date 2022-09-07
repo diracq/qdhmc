@@ -17,6 +17,8 @@ test_q = HMC(log_prob, kernel_type='quantum', precision=precision, num_vars=n)
 samples, sample_mean, sample_stddev, is_accepted, results = test_q.run_hmc(1000, 100)
 ```
 
+Check out the examples folder to see more demonstrations and complex use cases of QD-HMC. 
+
 There are a few limitations of note. Because this is built on CV-TFQ, there are limitations to the CV operators. Specifically, they are not ammenable to the usual numpy/TF broadcasting and vectorization. This requires all functions to be explicitly indexed, e.g. `lambda x : -x - x**2` will not work but `np.sum([-1 * x[i] for i in range(n)] + [-1 * x[i]**2 for i in range(n)])` will. These ops also have a few other quirks worth noting, `-op` is not allowed and you must used `-1 * op`. The only mathematical operations supported are the basic addition, subtraction, multiplication, and exponentiation (by positive integer). More complex functions must be approximated using these function. 
 
 ## Citation
