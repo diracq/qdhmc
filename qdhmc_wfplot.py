@@ -242,7 +242,7 @@ class HMC(object):
 
     def run_hmc(self, num_samples, num_burnin, init_state=None):
         """
-        Initialize member variables.
+        Run the HMC optimization.
 
         Args:
             - num_samples (int): number of optimization steps
