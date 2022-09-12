@@ -15,7 +15,5 @@ google-auth==1.18.0
 google-api-python-client==1.8.0
 grpcio==1.34.1
 protobuf==3.17.3
-
 matplotlib
-#gym==0.24.0
 tensorflow_probability==0.15.0 # TFP 0.16.0 requires TF==2.8.0, TFP 0.17.0 (newest) requires TF==2.9.0
