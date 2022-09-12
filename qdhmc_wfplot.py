@@ -15,9 +15,20 @@ from cv_ops import PositionOp, MomentumOp
 from cv_subroutines import centeredQFT
 from cv_utils import domain_float_tf, domain_bin_tf
 
+# Added waveforms into results
 RWResult = collections.namedtuple("RWResult", ['target_log_prob', 'wfs', 'log_acceptance_correction'])
 
 class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
+    '''
+    Transition kernel that integrates QD-HMC for MH algorithms. Based on [arxiv paper link (TBD)].
+    Exposes waveforms from all trotter steps of each QD-HMC update in results of kernel to allow for plotting.
+    Inputs:
+        - target_log_prob (callable): negative logarithm of probability distribution
+        - precision (int): number of qubits in discretization of each variable
+        - t (float): time of quantum evolution
+        - r (int): number of steps in Trotter approximation
+        - num_vars (int): number of variables in probability distribution
+    '''
 
     def __init__(self, target_log_prob, precision, t, r, num_vars):
         self._parameters = dict(
@@ -66,6 +77,15 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
         return False
 
     def generate_circuits(self, r, xs, eta, lam):
+        '''
+        Creates quantum circuit used to sample a new state. Uses cv-tfq library.
+        Analogous to evolving in a classical potential of neg log prob dist.
+        Inputs:
+            r (int): Number of Trotter steps
+            xs (string): Initial bitstring
+            eta (float): Randomized parameter for Kinetic term
+            lam (float): Randomized parameter for Potential term
+        '''
         circuit_list = []
         circuit = cirq.Circuit()
         for i, qubits in enumerate(self.qubits):
@@ -130,7 +150,19 @@ class QDHMCKernel(tfp.python.mcmc.kernel.TransitionKernel):
 
     
 class HMC(object):
-
+    '''
+    Integrates MH with classical or quantum dynamical HMC transition kernel.
+    Uses standard HMC kernel from tfp in the classical case.
+    Inputs:
+        - target_log_prob (callable): negative logarithm of probability distribution
+        - num_vars (int): number of variables in probability distribution
+        - precision (int): number of qubits in discretization of each variable
+        - kernel_type (string): which kernel to use (classical or quantum)
+        - step_size (float): if classical, step size to use for HMC
+        - steps (int): if classical, number of steps to use in each iteration of HMC
+        - t (float): if quantum, time of quantum evolution
+        - r (int): if quantum, number of steps in Trotter approximation
+    '''
     def __init__(self, target_log_prob, num_vars, precision, kernel_type="classical", step_size=1.0, steps=3, t=None, r=None):
         self.precision = precision
         self.num_vars = num_vars
