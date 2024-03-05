@@ -1,6 +1,6 @@
 # QD-HMC
 
-This repository contains the code and plotting functions to recreate the Quantum Dynamical Hamiltonian Monte Carlo (QD-HMC) algorithm. It is built on [TensorFlow-Quantum](https://www.tensorflow.org/quantum) (TFQ), [TensorFlow-Probability](https://www.tensorflow.org/probability) (TFP), and [Continuous-Variable TensorFlow-Quantum](https://github.com/QuantumVerd/cv-tfq) (CV-TFQ). 
+This repository contains the code and plotting functions to recreate the [Quantum Dynamical Hamiltonian Monte Carlo (QD-HMC) algorithm](https://arxiv.org/abs/2403.01775). It is built on [TensorFlow-Quantum](https://www.tensorflow.org/quantum) (TFQ), [TensorFlow-Probability](https://www.tensorflow.org/probability) (TFP), and [Continuous-Variable TensorFlow-Quantum](https://github.com/QuantumVerd/cv-tfq) (CV-TFQ). 
 
 This repo also contains an implementation of the QMCMC algorithm from this [paper](https://arxiv.org/pdf/2203.12497.pdf), which can be found in the MH directory. 
 
@@ -26,6 +26,11 @@ There are a few limitations of note. Because this is built on CV-TFQ, there are 
 If you use or build upon QD-HMC in your work, please cite our technical [paper]():
 
 ```bibtex
-@article{qdhmc2022,
-  TBD
+@misc{lockwood2024quantum,
+      title={Quantum Dynamical Hamiltonian Monte Carlo}, 
+      author={Owen Lockwood and Peter Weiss and Filip Aronshtein and Guillaume Verdon},
+      year={2024},
+      eprint={2403.01775},
+      archivePrefix={arXiv},
+      primaryClass={quant-ph}
 }
