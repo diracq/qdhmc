@@ -23,7 +23,7 @@ There are a few limitations of note. Because this is built on CV-TFQ, there are 
 
 ## Citation
 
-If you use or build upon QD-HMC in your work, please cite our technical [paper]():
+If you use or build upon QD-HMC in your work, please cite our technical [paper](https://arxiv.org/abs/2403.01775):
 
 ```bibtex
 @misc{lockwood2024quantum,
