@@ -17,3 +17,17 @@ examples/qdhmc.py
 examples/__pycache__/qdhmc.cpython-39.pyc
 MH/.ipynb_checkpoints/qmcmc_example-checkpoint.ipynb
 examples/.ipynb_checkpoints/qdhmc_energy_comparison_plots-checkpoint.ipynb
+examples/c_dw.npy
+examples/c_g.npy
+examples/c_r.npy
+examples/c_st.npy
+examples/q_dw.npy
+examples/q_g.npy
+examples/q_r.npy
+examples/q_st.npy
+examples/tau.png
+examples/.ipynb_checkpoints/autocorrelation-checkpoint.ipynb
+examples/.ipynb_checkpoints/trajectory_comparison-checkpoint.ipynb
+examples/tau_g.png
+examples/tau_r.png
+examples/tau_st.png
