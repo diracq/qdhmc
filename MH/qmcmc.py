@@ -6,13 +6,14 @@ import cirq
 import sympy
 import collections
 
-RWResult = collections.namedtuple("RWResult", 'target_log_prob')
+RWResult = collections.namedtuple("RWResult", "target_log_prob")
+
 
 class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
     """
     Transition kernel that integrates quantum enhanced MCMC for MH algorithms.
-    
-    Based on https://arxiv.org/pdf/2203.12497.pdf. Currently only supports 1D ising models. 
+
+    Based on https://arxiv.org/pdf/2203.12497.pdf. Currently only supports 1D ising models.
 
     Inputs:
         - Size (int): length of the ising chain
@@ -40,20 +41,23 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         hs = tf.cast(hs, dtype=tf.float32)
         temp = tf.cast(temp, dtype=tf.float32)
         self._parameters = dict(
-            target_log_prob_fn = self.ising_model_energy_1d,
-            size_q = size,
-            js = js,
-            hs = hs,
-            rep = r,
-            temperature = temp
+            target_log_prob_fn=lambda x : -1 * self.ising_model_energy_1d(x),
+            size_q=size,
+            js=js,
+            hs=hs,
+            rep=r,
+            temperature=temp,
         )
         self.sample = tfq.layers.Sample()
         self.qubits = [cirq.GridQubit(0, i) for i in range(size)]
-        self.alpha = tf.math.sqrt(tf.cast(size, dtype=tf.float32)) / tf.math.sqrt(tf.math.reduce_sum(tf.math.pow(js, 2)) + tf.math.reduce_sum(tf.math.pow(hs, 2))) 
-        a = sympy.symbols('a')
-        b = sympy.symbols('b0:%d'%size)
-        theta = sympy.symbols('theta0:%d'%size)
-        xs = sympy.symbols('xs0:%d'%size)
+        self.alpha = tf.math.sqrt(tf.cast(size, dtype=tf.float32)) / tf.math.sqrt(
+            tf.math.reduce_sum(tf.math.pow(js, 2))
+            + tf.math.reduce_sum(tf.math.pow(hs, 2))
+        )
+        a = sympy.symbols("a")
+        b = sympy.symbols("b0:%d" % size)
+        theta = sympy.symbols("theta0:%d" % size)
+        xs = sympy.symbols("xs0:%d" % size)
         self.trotterized_circuit = self.make_circuit(self.rep, xs, a, b, theta)
         self.params = list(xs) + [a] + list(b) + list(theta)
 
@@ -70,7 +74,9 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         if len(spins.shape) == 1:
             spins = tf.expand_dims(spins, axis=1)
         spins = tf.cast(spins, dtype=tf.float32)
-        interaction_e = tf.math.reduce_sum(self.js * tf.roll(spins, -1, axis=1) * spins, axis=1)
+        interaction_e = tf.math.reduce_sum(
+            self.js * tf.roll(spins, -1, axis=1) * spins, axis=1
+        )
         background_e = tf.math.reduce_sum(self.hs * spins, axis=1)
         return (-interaction_e - background_e) / self.temperature
 
@@ -78,33 +84,35 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
     def ising_model_energy_2d(self, spins):
         spins = tf.cast(spins, dtype=tf.float32)
         # Since js is upper triangular matrix, where js[i][j] = J_{i, j}
-        interaction_e = tf.math.reduce_sum(tf.multiply(tf.multiply(js, spins), tf.transpose(spins)))
+        interaction_e = tf.math.reduce_sum(
+            tf.multiply(tf.multiply(self.js, spins), tf.transpose(spins))
+        )
         background_e = tf.math.reduce_sum(self.hs * spins, axis=1)
         return (-interaction_e - background_e) / self.temperature
 
     @property
     def target_log_prob_fn(self):
-        return self._parameters['target_log_prob_fn']
-    
+        return self._parameters["target_log_prob_fn"]
+
     @property
     def size_q(self):
-        return self._parameters['size_q']
+        return self._parameters["size_q"]
 
     @property
     def js(self):
-        return self._parameters['js']
+        return self._parameters["js"]
 
     @property
     def hs(self):
-        return self._parameters['hs']
+        return self._parameters["hs"]
 
     @property
     def rep(self):
-        return self._parameters['rep']
-    
+        return self._parameters["rep"]
+
     @property
     def temperature(self):
-        return self._parameters['temperature']
+        return self._parameters["temperature"]
 
     @property
     def is_calibrated(self):
@@ -126,7 +134,7 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         """
         circuit = cirq.Circuit()
         for i, q in enumerate(self.qubits):
-            circuit += cirq.X(q)**xs[i]
+            circuit += cirq.X(q) ** xs[i]
         for i in range(r):
             for j, q in enumerate(self.qubits):
                 circuit += cirq.rx(2 * a).on(q)
@@ -149,7 +157,7 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         """
         Generate the next proposal.
 
-        Randomly selects the a and b parameters and parameterizes the trotterized 
+        Randomly selects the a and b parameters and parameterizes the trotterized
         circuit with them. Converts the current state and encodes it to the circuit. The
         circuit is then simulated and the output is converted back into a float and returned.
 
@@ -158,7 +166,7 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
 
         Args:
             - current_state (float): the current parameters of the distribution
-            - previous_kernel_results (RWResult): tuple that contains the information from the 
+            - previous_kernel_results (RWResult): tuple that contains the information from the
                 previous iteration
             - seed (int, optional): set the random seed (note that it is not used in the sampling
                 from the circuit, so it will not ensure replicatability)
@@ -171,13 +179,17 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         dt = t / self.rep
         a = gamma * dt
         b = -(1 - gamma) * self.alpha * self.hs * dt
-        theta = - 2 * self.js * (1 - gamma) * self.alpha * dt
+        theta = -2 * self.js * (1 - gamma) * self.alpha * dt
 
         # The first of these is to encode the binary values into the circuit
         values = tf.concat([(current_state[0] - 1) / (-2), [a], b, theta], axis=0)
         # This could be updates to increase samples and take the most common one
-        next_state = self.sample(self.trotterized_circuit, \
-            symbol_names=self.params, symbol_values=[values], repetitions=1).to_tensor()[0]
+        next_state = self.sample(
+            self.trotterized_circuit,
+            symbol_names=self.params,
+            symbol_values=[values],
+            repetitions=1,
+        ).to_tensor()[0]
 
         next_spins = next_state * -2 + 1
         next_spins = tf.reshape(next_spins, [1, self.size_q])
@@ -186,8 +198,9 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         next_target_log_prob = self.target_log_prob_fn(next_spins)
 
         new_kernel_results = previous_kernel_results._replace(
-            target_log_prob = next_target_log_prob)
-        
+            target_log_prob=next_target_log_prob
+        )
+
         return next_spins, new_kernel_results
 
     def bootstrap_results(self, init_state):
@@ -200,16 +213,15 @@ class QuantumMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         Returns:
             - (RWResult): the bootstrapped proposal
         """
-        kernel_results = RWResult(
-            target_log_prob = self.target_log_prob_fn(init_state)
-        )
+        kernel_results = RWResult(target_log_prob=self.target_log_prob_fn(init_state))
         return kernel_results
+
 
 class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
     """
     Transition kernel that integrates TFP with discrete ising model methods.
 
-    Currently only supports 1D ising models. 
+    Currently only supports 1D ising models.
     Currently only supports uniform random new proposals (hamming distance 1 proposals to be added).
 
     Inputs:
@@ -237,11 +249,11 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         hs = tf.cast(hs, dtype=tf.float32)
         temp = tf.cast(temp, dtype=tf.float32)
         self._parameters = dict(
-            target_log_prob_fn = self.ising_model_energy_1d,
-            size_q = size,
-            js = js,
-            hs = hs,
-            temperature = temp
+            target_log_prob_fn=lambda x : -1 * self.ising_model_energy_1d(x),
+            size_q=size,
+            js=js,
+            hs=hs,
+            temperature=temp,
         )
 
     def ising_model_energy_1d(self, spins):
@@ -257,7 +269,9 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         if len(spins.shape) == 1:
             spins = tf.expand_dims(spins, axis=1)
         spins = tf.cast(spins, dtype=tf.float32)
-        interaction_e = tf.math.reduce_sum(self.js * tf.roll(spins, -1, axis=1) * spins, axis=1)
+        interaction_e = tf.math.reduce_sum(
+            self.js * tf.roll(spins, -1, axis=1) * spins, axis=1
+        )
         background_e = tf.math.reduce_sum(self.hs * spins, axis=1)
         return (-interaction_e - background_e) / self.temperature
 
@@ -265,29 +279,31 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
     def ising_model_energy_2d(self, spins):
         spins = tf.cast(spins, dtype=tf.float32)
         # Since js is upper triangular matrix, where js[i][j] = J_{i, j}
-        interaction_e = tf.math.reduce_sum(tf.multiply(tf.multiply(js, spins), tf.transpose(spins)))
+        interaction_e = tf.math.reduce_sum(
+            tf.multiply(tf.multiply(self.js, spins), tf.transpose(spins))
+        )
         background_e = tf.math.reduce_sum(self.hs * spins, axis=1)
         return (-interaction_e - background_e) / self.temperature
 
     @property
     def target_log_prob_fn(self):
-        return self._parameters['target_log_prob_fn']
-    
+        return self._parameters["target_log_prob_fn"]
+
     @property
     def size_q(self):
-        return self._parameters['size_q']
+        return self._parameters["size_q"]
 
     @property
     def js(self):
-        return self._parameters['js']
+        return self._parameters["js"]
 
     @property
     def hs(self):
-        return self._parameters['hs']
-    
+        return self._parameters["hs"]
+
     @property
     def temperature(self):
-        return self._parameters['temperature']
+        return self._parameters["temperature"]
 
     @property
     def is_calibrated(self):
@@ -301,7 +317,7 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
 
         Args:
             - current_state (float): the current parameters of the distribution
-            - previous_kernel_results (RWResult): tuple that contains the information from the 
+            - previous_kernel_results (RWResult): tuple that contains the information from the
                 previous iteration
             - seed (int, optional): set the random seed (note that it is not used in the sampling
                 from the circuit, so it will not ensure replicatability)
@@ -309,14 +325,22 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         Returns:
             - (RWResult): the next proposal
         """
-        next_spins = tf.cast(tf.random.uniform(shape=[1, self.size_q], minval=0, maxval=2, dtype=tf.int32) * 2 - 1, tf.float32)
+        next_spins = tf.cast(
+            tf.random.uniform(
+                shape=[1, self.size_q], minval=0, maxval=2, dtype=tf.int32
+            )
+            * 2
+            - 1,
+            tf.float32,
+        )
 
         next_target_log_prob = self.target_log_prob_fn(next_spins)
 
         next_target_log_prob = tf.cast(next_target_log_prob, dtype=tf.float32)
 
         new_kernel_results = previous_kernel_results._replace(
-            target_log_prob = next_target_log_prob)
+            target_log_prob=next_target_log_prob
+        )
 
         next_spins = tf.cast(next_spins, dtype=tf.float32)
         return next_spins, new_kernel_results
@@ -331,10 +355,9 @@ class ClassicalMCMCIsingKernel(tfp.python.mcmc.kernel.TransitionKernel):
         Returns:
             - (RWResult): the bootstrapped proposal
         """
-        kernel_results = RWResult(
-            target_log_prob = self.target_log_prob_fn(init_state)
-        )
+        kernel_results = RWResult(target_log_prob=self.target_log_prob_fn(init_state))
         return kernel_results
+
 
 class IsingMH(object):
     """
@@ -366,9 +389,13 @@ class IsingMH(object):
         """
         self.n = size
         if kernel_type == "quantum":
-            self.kernel = tfp.mcmc.MetropolisHastings(QuantumMCMCIsingKernel(size, js, hs, r, temp))
+            self.kernel = tfp.mcmc.MetropolisHastings(
+                QuantumMCMCIsingKernel(size, js, hs, r, temp)
+            )
         else:
-            self.kernel = tfp.mcmc.MetropolisHastings(ClassicalMCMCIsingKernel(size, js, hs, r, temp))
+            self.kernel = tfp.mcmc.MetropolisHastings(
+                ClassicalMCMCIsingKernel(size, js, hs, r, temp)
+            )
 
     def run_mcmc(self, num_results, num_burnin, init_state=None):
         """
@@ -383,7 +410,16 @@ class IsingMH(object):
             - (tuple): a tuple containing information about the states, acceptance rates, and results
         """
         if init_state is None:
-            init_state = tf.cast((tf.random.uniform(shape=(1, self.n), minval=0, maxval=2, dtype=tf.int32) * 2) - 1, tf.float32)
+            init_state = tf.cast(
+                (
+                    tf.random.uniform(
+                        shape=(1, self.n), minval=0, maxval=2, dtype=tf.int32
+                    )
+                    * 2
+                )
+                - 1,
+                tf.float32,
+            )
 
         @tf.function
         def run_chain():
@@ -393,7 +429,8 @@ class IsingMH(object):
                 num_burnin_steps=num_burnin,
                 current_state=init_state,
                 kernel=self.kernel,
-                trace_fn=lambda _, pkr: (pkr.is_accepted, pkr.accepted_results))
+                trace_fn=lambda _, pkr: (pkr.is_accepted, pkr.accepted_results),
+            )
 
             sample_mean = tf.reduce_mean(samples)
             sample_stddev = tf.math.reduce_std(samples)
@@ -401,4 +438,3 @@ class IsingMH(object):
             return samples, sample_mean, sample_stddev, is_accepted, results
 
         return run_chain()
-    
